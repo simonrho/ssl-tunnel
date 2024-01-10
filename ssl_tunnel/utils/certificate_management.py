@@ -15,7 +15,7 @@ try:
     from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 
-    from ..utils.logging_config import log
+    from ..utils.logging_config import logger
 
 except Exception as e:
     sys.exit(f'❌ Module import Error: {e}')
@@ -30,31 +30,6 @@ class SSLCertificate:
             key_size=key_size,
             backend=default_backend()              
         )
-
-    # @staticmethod
-    # def create_self_signed_certificate(key, name, days=365, subject_fields=None):
-    #     # Create a self-signed certificate
-    #     try:
-    #         subject = x509.Name([
-    #             x509.NameAttribute(NameOID.COMMON_NAME, name),
-    #         ] + ([x509.NameAttribute(getattr(NameOID, field), value) for field, value in (subject_fields or {}).items()]))
-    #         cert = x509.CertificateBuilder().subject_name(
-    #             subject
-    #         ).issuer_name(
-    #             subject
-    #         ).public_key(
-    #             key.public_key()
-    #         ).serial_number(
-    #             x509.random_serial_number()
-    #         ).not_valid_before(
-    #             datetime.datetime.utcnow()
-    #         ).not_valid_after(
-    #             # Our certificate will be valid for 'days' days
-    #             datetime.datetime.utcnow() + datetime.timedelta(days=days)
-    #         ).sign(key, hashes.SHA256())
-    #         return cert
-    #     except Exception as e:
-    #         sys.exit(f'❗ self-signed certificate generation error:{e}')
 
     @staticmethod
     def create_self_signed_certificate(key, name, days=365, subject_fields=None):
@@ -83,7 +58,7 @@ class SSLCertificate:
     class PEMFileHandler(FileSystemEventHandler):
         def on_created(self, event):
             if isinstance(event, FileCreatedEvent) and event.src_path.endswith('.pem'):
-                log(f"🔍 New .pem file detected: {event.src_path}", console=False)
+                logger.info(f"🔍 New .pem file detected: {event.src_path}", console=False)
                 SSLCertificate.c_rehash(os.path.dirname(event.src_path))
 
     @staticmethod

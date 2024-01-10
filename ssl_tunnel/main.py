@@ -13,7 +13,7 @@ from .core.cli import *
 
 from .utils.certificate_management import *
 from .utils.validators import *
-from .utils.logging_config import *
+from .utils.logging_config import logger
 
 try:
     from cryptography.hazmat.primitives import serialization
@@ -23,15 +23,15 @@ except Exception as e:
 def print_mode_info(args):
     if args.command in ['server', 'client']:
         m = f' The SSL Tunnel {args.command.capitalize()} starts '
-        log('*' * len(m))
-        log(m)  
-        log('*' * len(m))
+        logger.info('*' * len(m))
+        logger.info(m)  
+        logger.info('*' * len(m))
       
         auth_mode = 'no auth' if args.no_auth else 'auth'
-        log(f'📌 Running on the {auth_mode} mode in {args.operation_mode} operation')
+        logger.info(f'🚀 Running on the {auth_mode} mode in {args.operation_mode} operation')
         
     vs = pprint.pformat(vars(args))
-    log(f'🚚 Execute CLI command("{args.command}") and args:\n{vs}', console=False)
+    logger.info(f'🚚 Execute CLI command("{args.command}") and args:\n{vs}', console=False)
 
 def signal_handler(sig, frame):
     if not shutdown_event.is_set():
@@ -42,11 +42,11 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 def main():
     if sys.version_info < (3, 7):
-        log("🐍✋ Hold up! Python 3.7 or higher is required to run this program.", log_level='error')
+        logger.error("🐍✋ Hold up! Python 3.7 or higher is required to run this program.")
         sys.exit(1)
 
     if not platform.system() == 'Linux':
-        log("🐧🚫 Whoops! This script is exclusively designed for Linux.", log_level='error')
+        logger.error("🐧🚫 Whoops! This script is exclusively designed for Linux.")
         sys.exit(1)
 
     args = parse_args()
@@ -65,7 +65,7 @@ def main():
             
             if not args.no_auth:
                 if not args.cert_file or not args.key_file:
-                    log("❗ Error: --cert-file and --key-file must be provided unless --no-auth is specified.")
+                    logger.error("❗ Error: --cert-file and --key-file must be provided unless --no-auth is specified.")
                     sys.exit(1)
 
             flow_and_route_manager = FlowAndRouteManager()
@@ -92,11 +92,11 @@ def main():
                     threading.Thread(target=ssl_server.start, daemon=True).start()
                     ssl_server.handle_tun_port_data()
             except Exception as e:
-                log(f"❗ An error occurred: {e}", log_level='error')
+                logger.error(f"❗ An error occurred: {e}")
             finally:
                 shutdown_event.set()
                 flow_and_route_manager.session_cleanup()
-                log("\n🅿️  SSL server stopped.")
+                logger.info("\n🅿️  SSL server stopped.")
 
     elif args.command == 'client':
         if args.client_command == 'load':
@@ -108,7 +108,7 @@ def main():
         elif args.client_command == 'start':
             
             if not args.server_address:
-                log('🤔 Oops! The option "--server-address" is missing.', log_level='error')
+                logger.error('🤔 Oops! The option "--server-address" is missing.')
                 sys.exit(1)
             
             print_mode_info(args)
@@ -118,7 +118,7 @@ def main():
             
             if not args.no_auth:
                 if not args.cert_file or not args.key_file:
-                    log("❗ Error: --cert-file and --key-file must be provided unless --no-auth is specified.")
+                    logger.error("❗ Error: --cert-file and --key-file must be provided unless --no-auth is specified.")
                     sys.exit(1)
             
             try:        
@@ -143,16 +143,16 @@ def main():
                         ssl_client.handle_tun_port_data()
                         
                         if not shutdown_event.is_set() and not args.disable_auto_reconnect:
-                            log('🔄 Auto reconnecting to the SSL server...')
+                            logger.info('🔄 Auto reconnecting to the SSL server...')
                             time.sleep(3)
                         else:
                             break
                     
             except Exception as e:
-                log(f"❗ An error occurred: {e}")
+                logger.error(f"❗ An error occurred: {e}")
             finally:
                 shutdown_event.set()
-                log("🅿️  SSL client stopped.")
+                logger.info("🅿️  SSL client stopped.")
 
     elif args.command == 'certificate':
         cert_key = SSLCertificate.create_key_pair(key_size=args.key_size)
@@ -172,12 +172,12 @@ def main():
         with open(args.cert_out_file, 'wb') as f:
             f.write(cert.public_bytes(serialization.Encoding.PEM))
 
-        log(f"📜 Self-signed certificate created: {args.cert_out_file}")
-        log(f"🔑 Certificate key created: {args.key_out_file}")
-        log("🏁 Note: ")
-        log("   🔒 Secure your certificate and key files!")
-        log("   🛡️ Ensure that they are stored in a secure, access-controlled location,")
-        log("   💾 and are backed up appropriately.\n")
+        logger.info(f"📜 Self-signed certificate created: {args.cert_out_file}")
+        logger.info(f"🔑 Certificate key created: {args.key_out_file}")
+        logger.info("🏁 Note: ")
+        logger.info("   🔒 Secure your certificate and key files!")
+        logger.info("   🛡️ Ensure that they are stored in a secure, access-controlled location,")
+        logger.info("   💾 and are backed up appropriately.\n")
 
 if __name__ == '__main__':
     main()

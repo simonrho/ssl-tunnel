@@ -18,7 +18,7 @@ except Exception as e:
     sys.exit(f'❌ Module import Error: {e}')
 
 from ..utils.certificate_management import *
-from ..utils.logging_config import log
+from ..utils.logging_config import logger
 from ..utils.validators import *
 from .global_resources import *
 
@@ -87,7 +87,7 @@ def resolve_fqdn(ip_address):
 
 def move_file(src, dst, overwrite=False):
     if os.path.exists(dst) and not overwrite:
-        log(f"🚨 File {dst} already exists. Skipping exporting to prevent overwriting.", log_level='warning')
+        logger.warning(f"🚨 File {dst} already exists. Skipping exporting to prevent overwriting.")
         return False
     else:
         shutil.move(src, dst)
@@ -97,9 +97,9 @@ def ensure_directory_exists(directory):
     if not os.path.exists(directory):
         try:
             os.makedirs(directory)
-            log(f"📂 Created directory: {directory}")
+            logger.info(f"📂 Created directory: {directory}")
         except OSError as e:
-            log(f"❌ Failed to create directory {directory}: {e}", log_level='error')
+            logger.error(f"❌ Failed to create directory {directory}: {e}")
             sys.exit(1)
 
 def check_conflict_in_common_name(name, trust_store_path):
@@ -245,9 +245,9 @@ def ssl_tunnel_init_cmd(default_config, overwrite=False):
         if not os.path.exists(path):
             os.makedirs(path)
         elif overwrite:
-            log(f"🔄 Overwriting existing directory: {path}")
+            logger.info(f"🔄 Overwriting existing directory: {path}")
         else:
-            log(f"🚨 Directory already exists: {path}")
+            logger.info(f"🚨 Directory already exists: {path}")
 
     # Generate certificate and key
     if not os.path.exists(cert_path) or not os.path.exists(key_path) or overwrite:
@@ -263,45 +263,45 @@ def ssl_tunnel_init_cmd(default_config, overwrite=False):
                 format=serialization.PrivateFormat.TraditionalOpenSSL,
                 encryption_algorithm=serialization.NoEncryption()))
 
-        log(f"📜 Generated certificate: {cert_path}")
-        log(f"🔑 Generated private key: {key_path}")
+        logger.info(f"📜 Generated certificate: {cert_path}")
+        logger.info(f"🔑 Generated private key: {key_path}")
     else:
-        log("🚨 Certificate and key already exist. Use --overwrite to regenerate.")
+        logger.warning("🚨 Certificate and key already exist. Use --overwrite to regenerate.")
 
     # Create default configuration file
     if not os.path.exists(config_path) or overwrite:
         with open(config_path, 'w') as f:            
             json.dump(default_config, f, indent=4)
                 
-        log(f"👌 Created default configuration file: {config_path}")
+        logger.info(f"👌 Created default configuration file: {config_path}")
     else:
-        log("🚨 Configuration file already exists. Use --overwrite to regenerate.")
+        logger.warning("🚨 Configuration file already exists. Use --overwrite to regenerate.")
 
 def server_create_client_cmd(args):
     if not os.path.exists(args.trust_store):
-        log(f"❌ Trust store directory '{args.trust_store}' does not exist. Certificate not copied. Exiting...", log_level='error')
+        logger.error(f"❌ Trust store directory '{args.trust_store}' does not exist. Certificate not copied. Exiting...")
         sys.exit(1)
         
     if not os.access(args.trust_store, os.W_OK):
-        log(f"🚫 Write permission denied for the Trust store directory '{args.trust_store}'.", log_level='error')
+        logger.error(f"🚫 Write permission denied for the Trust store directory '{args.trust_store}'.")
         sys.exit(1)
         
         
     config_file = '/etc/ssl-tunnel/config.json'
     if not os.path.exists(config_file):
-        log(f"❌ SSL Tunnel config file '{config_file}' does not exist.", log_level='error')
+        logger.error(f"❌ SSL Tunnel config file '{config_file}' does not exist.")
         sys.exit(1)
         
     try:
         with open(config_file) as f:
             config = json.load(f)
     except Exception as e:
-        log(f'❗ config file open error: {e}')
+        logger.error(f'❗ config file open error: {e}')
         sys.exit(1)
         
     server_cert_file = config.get('server', {}).get('cert_file', None)
     if server_cert_file is None:
-        log(f'❌ server certificate does not exist. Please initalize server using "init-server" command', log_level='error')
+        logger.error(f'❌ server certificate does not exist. Please initalize server using "init-server" command')
         sys.exit(1)
                 
     server_address = args.server_address
@@ -316,8 +316,8 @@ def server_create_client_cmd(args):
             else:
                 raise ValueError("FQDN resolution failed.")
         except Exception as e:
-            print(f"❗ Error: {e}")
-            print("🙏 Please provide a FQDN or IP address manually using the --server-address option.")
+            logger.error(f"❗ Error: {e}")
+            logger.info("🙏 Please provide a FQDN or IP address manually using the --server-address option.")
             return
 
     try:        
@@ -326,7 +326,7 @@ def server_create_client_cmd(args):
             if not args.overwrite:
                 raise ValueError(f'A client with the common name "{name}" already exists in the trust store. Use the "--overwrite" option if necessary.')
             else:
-                log(f'🔄 A client with the common name "{name}" already exists in the trust store, but will be overwritten.')
+                logger.info(f'🔄 A client with the common name "{name}" already exists in the trust store, but will be overwritten.')
 
         with tempfile.TemporaryDirectory() as temp_dir:
             client_key = SSLCertificate.create_key_pair()
@@ -369,12 +369,12 @@ def server_create_client_cmd(args):
                 tar.add(config_path, arcname='config.json')
                 tar.add(server_cert_file, arcname='server.pem')
 
-            log(f'🖥️  Server address: "{server_address}:{args.server_port}" has been included in the client profile.')
-            log(f'👌 Client profile for "{name}" has been created and archived into "{tar_gz_file_path}".')
-            log("👏 The new client certificate has been copied to the server's trust store.")
+            logger.info(f'🖥️  Server address: "{server_address}:{args.server_port}" has been included in the client profile.')
+            logger.info(f'👌 Client profile for "{name}" has been created and archived into "{tar_gz_file_path}".')
+            logger.info("👏 The new client certificate has been copied to the server's trust store.")
 
     except Exception as e:
-        log(f'❌ Client profile creation error: {e}', log_level='error')
+        logger.error(f'❌ Client profile creation error: {e}')
         sys.exit(1)
         
 def client_load_cmd(args):
@@ -400,9 +400,9 @@ def client_load_cmd(args):
                 dest_dir = ssl_tunnel_dir if file_name != 'server.pem' else trust_store_dir
                 dest_path = dest_dir / file_name
                 if not move_file(src_path, dest_path, args.overwrite):
-                    log(f"❌ Error exporting {file_name} to {dest_path}")                    
+                    logger.error(f"❌ Error exporting {file_name} to {dest_path}")                    
                     return
 
-    log(f"👌 Client configuration and certificates have been successfully extracted and set up.")
+    logger.info(f"👌 Client configuration and certificates have been successfully extracted and set up.")
 
 

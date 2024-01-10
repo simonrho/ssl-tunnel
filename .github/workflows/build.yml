@@ -1,0 +1,51 @@
+name: Publish Python Package to PyPI
+
+on:
+  push:
+    branches: 
+      - main  # Trigger on pushes to the main branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+      with:
+        token: ${{ secrets.TOC_TOKEN }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'  # Set the Python version
+
+    - name: Fetch the current version from PyPI
+      id: get_version
+      run: |
+        package_name="ssl-tunnel"  # Replace with your package name
+        current_version=$(curl -s https://pypi.org/pypi/${package_name}/json | jq -r '.info.version')
+        echo "Current version: $current_version"
+        echo "::set-output name=CURRENT_VERSION::$current_version"
+
+    - name: Increment version
+      id: increment_version
+      run: |
+        new_version=$(python -c "version = '${{ steps.get_version.outputs.CURRENT_VERSION }}'.split('.'); version[-1] = str(int(version[-1]) + 1); print('.'.join(version))")
+        echo "New version: $new_version"
+        echo "::set-output name=NEW_VERSION::$new_version"
+
+    - name: Update version in setup.py
+      run: |
+        sed -i "s/version=.*/version='${{ steps.increment_version.outputs.NEW_VERSION }}'/g" setup.py
+
+    - name: Build package
+      run: |
+        pip install twine setuptools wheel
+        python setup.py sdist bdist_wheel
+
+    - name: Publish package
+      run: |
+        twine upload dist/* --verbose
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}  # Your PyPI API token

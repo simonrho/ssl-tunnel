@@ -1,6 +1,7 @@
 import ipaddress
 import os
 import fcntl
+import socket
 import struct
 import threading
 import time
@@ -11,7 +12,7 @@ try:
 except Exception as e:
     sys.exit(f'❌ Module import Error: {e}')
 
-from ..utils.logging_config import log
+from ..utils.logging_config import logger
 
 class TunInterface:
     lock = threading.Lock()  # A lock for synchronizing access
@@ -69,13 +70,12 @@ class TunInterface:
             raise Exception("❗ Netlink Iproute object not initialized")
 
     def cleanup_arp_cache(self):
-        if self.nl_ip:
+        if self.nl_ip and self.nl_idx:
             neighbors = self.nl_ip.get_neighbours(ifindex=self.nl_idx)
             for neighbor in neighbors:
-                self.nl_ip.neigh('delete',
-                                    dst=neighbor.get_attr('NDA_DST'),
-                                    lladdr=neighbor.get_attr('NDA_LLADDR'),
-                                    ifindex=self.nl_idx)
+                # Check if the neighbor entry is IPv4
+                if neighbor.get('family') == socket.AF_INET:
+                    self.nl_ip.neigh('delete', dst=neighbor.get_attr('NDA_DST'), lladdr=neighbor.get_attr('NDA_LLADDR'), ifindex=self.nl_idx)
 
     def create_tun_interface(self):
         TUNSETIFF = 0x400454ca
@@ -122,7 +122,7 @@ class TunInterface:
 
             self.nl_ip.link('set', index=self.nl_idx, state='up')
         else:
-            log(f'🔔 Warning: Failed to configure {self.cidr} on tunnel interface {self.name}.')
+            logger.warning(f'🔔 Warning: Failed to configure {self.cidr} on tunnel interface {self.name}.')
         
         # The system tries to use an IP address that is in the same subnet as the target of the ARP request
         setting_path = f"/proc/sys/net/ipv4/conf/{self.name}/arp_announce"

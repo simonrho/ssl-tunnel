@@ -11,7 +11,7 @@ try:
 except Exception as e:
     sys.exit(f'❌ Module import Error: {e}')
 
-from ..utils.logging_config import log
+from ..utils.logging_config import logger
 
 class BiMap:
     def __init__(self):
@@ -105,7 +105,7 @@ class FlowAndRouteManager:
                     if 'File exists' in str(e):
                         pass
                     else:
-                        log(f'🔔 Warning: Failed to add a route({route}): {e}')
+                        logger.warning(f'🔔 Warning: Failed to add a route({route}): {e}')
                     return False
         return True
 
@@ -116,7 +116,7 @@ class FlowAndRouteManager:
                 try:
                     ipdb.routes[route].remove().commit()
                 except Exception as e:
-                    log(f'🔔 Warning: Failed to remove a route({route}): {e}')
+                    logger.warning(f'🔔 Warning: Failed to remove a route({route}): {e}')
                     return False
         return True
 
@@ -126,7 +126,7 @@ class FlowAndRouteManager:
                 conn.shutdown(socket.SHUT_RDWR)
                 conn.close()
             except Exception as e:
-                log("❗ Error closing connection: {e}")
+                logger.error("❗ Error closing connection: {e}")
 
     def flood_broadcast(self, frame):
         with self.connection_lock:
@@ -135,5 +135,5 @@ class FlowAndRouteManager:
                     client.sendall(bytes(frame))
                 except Exception as e:
                     client_ip, client_port = client.getpeername()
-                    log(f'🛑 SSL client {client_ip}:{client_port} closed on the broadcast: {e}')
+                    logger.error(f'🛑 SSL client {client_ip}:{client_port} closed on the broadcast: {e}')
 

@@ -8,7 +8,7 @@ from threading import Semaphore
 import threading
 import time
 
-from ..utils.logging_config import log
+from ..utils.logging_config import logger
 from .network_protocol import Ethernet, ARP, IP, ROUTE
 from .global_resources import shutdown_event
 
@@ -67,12 +67,12 @@ class SSLServer:
             try:
                 sock.bind(self.address)
             except Exception as e:
-                log(f"❗ SSL Server Listen Address ({self.address[0]}:{self.address[1]}) Binding error: {str(e)}")
+                logger.error(f"❗ SSL Server Listen Address ({self.address[0]}:{self.address[1]}) Binding error: {str(e)}")
                 shutdown_event.set()
                 sys.exit(1)
             
             sock.listen(self.max_incoming_connection)
-            log(f"🚀 SSL server is running on {self.address[0]}:{self.address[1]}... Press CTRL+C to exit.")
+            logger.info(f"🏃 SSL server is running on {self.address[0]}:{self.address[1]}... Press CTRL+C to exit.")
 
             while not shutdown_event.is_set():
 
@@ -81,12 +81,14 @@ class SSLServer:
                 if sock in readable:
                     try:
                         client_sock, addr = sock.accept()
-                        log(f"🔗 SSL client ({addr[0]}:{addr[1]}) is connected.")
+                        
+                        logger.info(f"🔗 SSL client ({addr[0]}:{addr[1]}) is connected.")
+                        
                         connection = context.wrap_socket(client_sock, server_side=True)
                         thread_safe_connection = ThreadSafeSSLSocket(connection)
                         threading.Thread(target=self.handle_ssl_session_data, args=(thread_safe_connection, self.tun, semaphore, self.route_prefix_length), daemon=True).start()
                     except socket.error as e:
-                        log(f"❗ Socket error: {e}")
+                        logger.error(f"❗ Socket error: {e}")
                         continue
 
     def handle_ssl_session_data(self, connection, tun, semaphore, route_prefix_length=32):
@@ -101,7 +103,7 @@ class SSLServer:
                 client_ip, client_port = connection.getpeername()
                 time.sleep(3)
             except Exception as e:
-                log(f"❗ SSL handshake error: {e}")
+                logger.error(f"❗ SSL handshake error: {e}")
                 return
 
             self.flow_and_route_manager.add_connection(connection)
@@ -123,19 +125,19 @@ class SSLServer:
                     # Handle the case when the resource is temporarily unavailable.
                     # This section could be used to pause or yield the processor.
                     # Opting to let it continue, expecting more data to arrive later.
-                    # log(f'🔔 Warning: BlockingIOError encountered with SSL client ({client_ip}:{client_port}): {e}')
+                    # logger.info(f'🔔 Warning: BlockingIOError encountered with SSL client ({client_ip}:{client_port}): {e}')
                     continue
 
                 except ssl.SSLError as e:
-                    log(f"❗ SSL error with SSL client ({client_ip}:{client_port}): {e}")
+                    logger.error(f"❗ SSL error with SSL client ({client_ip}:{client_port}): {e}")
                     break
 
                 except Exception as e:
-                    log(f"❗ SSL client ({client_ip}:{client_port}) connection error: {e}")
+                    logger.error(f"❗ SSL client ({client_ip}:{client_port}) connection error: {e}")
                     break
 
                 if not data:
-                    log(f"❗ SSL client ({client_ip}:{client_port}) is disconnected.")
+                    logger.error(f"❗ SSL client ({client_ip}:{client_port}) is disconnected.")
                     break
 
                 if tun.operation_mode == 3:
@@ -159,7 +161,7 @@ class SSLServer:
                         tun.write(data)
 
                     except Exception as e:
-                        log("❗ Error writing to the TUN interface from SSL client ({client_ip}:{client_port}): {e}")
+                        logger.error("❗ Error writing to the TUN interface from SSL client ({client_ip}:{client_port}): {e}")
                         break
                 else:
                     # L2 operation mode
@@ -201,7 +203,7 @@ class SSLServer:
                         tun.write(data)
 
                     except Exception as e:
-                        log("❗ Error writing to the TAP interface from SSL client ({client_ip}:{client_port}): {e}")
+                        logger.error("❗ Error writing to the TAP interface from SSL client ({client_ip}:{client_port}): {e}")
                         break
 
         finally:
@@ -214,9 +216,9 @@ class SSLServer:
                 self.flow_and_route_manager.host_remove_route(route)
             
             if client_ip and client_port:
-                log(f'🗑️ SSL client ({client_ip}:{client_port}) {flow_count} flows, {route_count} routes have been removed.')
+                logger.info(f'🗑️ SSL client ({client_ip}:{client_port}) {flow_count} flows, {route_count} routes have been removed.')
 
-            log(f'🚫 SSL client ({client_ip}:{client_port}) has closed the connection')
+            logger.info(f'🚫 SSL client ({client_ip}:{client_port}) has closed the connection')
 
             connection.close()
             semaphore.release()
@@ -230,7 +232,7 @@ class SSLServer:
             try:
                 data = os.read(self.tun.fd, 65535)
             except Exception as e:
-                log(f'❗ Error: TUN/TAP interface: {e}')
+                logger.error(f'❗ Error: TUN/TAP interface: {e}')
                 break
 
             if not data:

@@ -7,7 +7,7 @@ import threading
 import time
 
 from .global_resources import *
-from ..utils.logging_config import log
+from ..utils.logging_config import logger
 from .network_protocol import IP
 
 class SSLClient:
@@ -46,6 +46,7 @@ class SSLClient:
                 try:
                     socket.setdefaulttimeout(self.retry_delay)
                     sock = socket.create_connection(self.server_address)
+                    sock.settimeout(None)
                     socket.setdefaulttimeout(None)
                     
                     sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
@@ -55,19 +56,19 @@ class SSLClient:
                     server_hostname = address
 
                     ssock = context.wrap_socket(sock, server_hostname=server_hostname)
-                    log(f"SSL client established connection with {address}:{port}... Press CTRL+C to exit.")
+                    logger.info(f"🔗 SSL client established connection with {address}:{port}... Press CTRL+C to exit.")
 
                     return ssock
                 except Exception as e:
                     if i < 3:
-                        log(f'❗ Error connecting to {address}:{port}: {e}. Retrying in {self.retry_delay} seconds...')
+                        logger.error(f'❗ Error connecting to {address}:{port}: {e}. Retrying in {self.retry_delay} seconds...')
                         time.sleep(self.retry_delay)
                         i += 1
                     else:
                         return None
 
         except Exception as e:
-            log(f'❗ Error creating ssl session: {e}')
+            logger.error(f'❗ Error creating ssl session: {e}')
             return None
 
     def handle_ssl_session_data(self, ssl_sock):
@@ -76,7 +77,7 @@ class SSLClient:
             server_ip, server_port = ssl_sock.getpeername()
             time.sleep(3)
         except Exception as e:
-            log(f"❗ SSL handshake error: {e}")
+            logger.error(f"❗ SSL handshake error: {e}")
             return
 
         while not shutdown_event.is_set():
@@ -95,14 +96,14 @@ class SSLClient:
                     # Handle the case when the resource is temporarily unavailable.
                     # This section could be used to pause or yield the processor.
                     # Opting to let it continue, expecting more data to arrive later.
-                    # log(f'🔔 Warning: BlockingIOError encountered with SSL server ({server_ip}:{server_port}): {e}')
+                    # logger.info(f'🔔 Warning: BlockingIOError encountered with SSL server ({server_ip}:{server_port}): {e}')
                     continue
                 except Exception as e:
-                    log(f"❗ SSL server ({server_ip}:{server_port}) connection error: {e}")
+                    logger.error(f"❗ SSL server ({server_ip}:{server_port}) connection error: {e}")
                     break
 
                 if not data:
-                    log('🛑 SSL client socket is closed')
+                    logger.info('🛑 SSL client socket is closed')
                     break
 
                 if self.tun.operation_mode == 3:
@@ -114,11 +115,11 @@ class SSLClient:
                     self.tun.write(data)
 
                 except Exception as e:
-                    log(f"🛑 TUN/TAP interface is closed: {e}")
+                    logger.error(f"🛑 TUN/TAP interface is closed: {e}")
                     break
 
             except Exception as e:
-                log("❗ Error in SSL thread: {e}")
+                logger.error("❗ Error in SSL thread: {e}")
                 break
 
     def handle_tun_port_data(self):
@@ -138,11 +139,11 @@ class SSLClient:
                     try:
                         data = os.read(self.tun.fd, 65535)
                     except Exception as e:
-                        log(f'❗ Error: TUN/TAP interface: {e}')
+                        logger.error(f'❗ Error: TUN/TAP interface: {e}')
                         break
 
                     if not data:
-                        log('🛑 Tun/Tap interface is closed.')
+                        logger.info('🛑 Tun/Tap interface is closed.')
                         break
 
                     if self.tun.operation_mode == 3:
@@ -156,7 +157,7 @@ class SSLClient:
                         pass
 
         except Exception as e:
-            log(f'🛑 SSL socket is closed: {e}')
+            logger.info(f'🛑 SSL socket is closed: {e}')
         finally:
             ssl_sock.close()
 
