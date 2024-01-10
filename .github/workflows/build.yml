@@ -36,7 +36,7 @@ jobs:
 
     - name: Update version in setup.py
       run: |
-        sed -i "s/version=.*/version='${{ steps.increment_version.outputs.NEW_VERSION }}'/g" setup.py
+        sed -i "s/version=.*/version='${{ steps.increment_version.outputs.NEW_VERSION }}',/g" setup.py
 
     - name: Build package
       run: |
